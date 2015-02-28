@@ -96,7 +96,6 @@ module.exports = function(options) {
 		passport.authenticate('bearer', {session: false}),
 		function(req, res) {
 			if (delete token_whitelist[req.authInfo.token]) {
-				console.log('deleted', req.authInfo.token)
 				res.sendStatus(200);
 			}
 			else {
