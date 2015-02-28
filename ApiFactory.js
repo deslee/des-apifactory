@@ -13,10 +13,14 @@ module.exports = function(options) {
 	var secret = options.secret;
 	var findUserByUsername = options.userQuery;
 
+	var tokenExpiration = options.tokenExpirationMinutes || 60;
+
 	router.use(passport.initialize());
 	router.use(methodOverride('X-HTTP-Method-Override'));
 	router.use(bodyParser.json());
 	router.use(bodyParser.urlencoded({extended: false}));
+	
+	var token_whitelist = {}
 
 	passport.use(new BearerStrategy(
 		{},
@@ -35,11 +39,11 @@ module.exports = function(options) {
 					if (!user) {
 						return done(null, false);
 					}
-					var userHasToken = user.tokens.indexOf(token) !== -1
-					if (!userHasToken) {
+					// check token validation
+					if (!token_whitelist[token]) {
 						return done(null, false);
 					}
-					return done(null, user);
+					return done(null, user, {token: token});
 				});	
 
 			});		
@@ -79,12 +83,10 @@ module.exports = function(options) {
 		'/token', 
 		passport.authenticate('local', {session: false}),
 		function(req, res) {
-			var username = req.body.username,
-				password = req.body.password;
-
 			var user = req.user;
-			var token = jwt.sign({id: user.id, name: user.name}, secret);
-			user.tokens.push(token);
+			
+			var token = jwt.sign({name: user.name}, secret, {expiresInMinutes: req.body.tokenExpiration || tokenExpiration});
+			token_whitelist[token] = user.name;
 			res.send(token);
 		}
 	);
@@ -93,17 +95,22 @@ module.exports = function(options) {
 		'/token',
 		passport.authenticate('bearer', {session: false}),
 		function(req, res) {
-			var token = req.get('Authorization').split(' ')[1];
-			var idx = req.user.tokens.indexOf(token);
-			if (idx !== -1) {
-				req.user.tokens.splice(idx, 1);
+			if (delete token_whitelist[req.authInfo.token]) {
+				console.log('deleted', req.authInfo.token)
 				res.sendStatus(200);
 			}
 			else {
-				res.sendStatus(401);
+				req.sendStatus(401);
 			}
 		}
 	);
 
+	router.get(
+		'/test',
+		passport.authenticate('bearer', {session: false}),
+		function(req, res) {
+			res.send(req.user.name);
+		}
+	);
 	return router;
 }
