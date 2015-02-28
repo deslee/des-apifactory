@@ -1,0 +1,44 @@
+var assert = require("assert")
+var request = require('supertest');
+var app = require('./testserver');
+
+describe('Server', function(){
+
+	it('should have a default route', function(done) {
+		request(app)
+			.get('/')
+			.expect(200)
+			.expect('hi')
+			.end(done)
+	});
+
+	describe('Token based authentication', function() {
+		var agent = request.agent(app);
+
+		it('should return bad request', function(done) {
+			agent
+				.post('/api/token')
+				.expect(400)
+				.end(done)
+		});
+		
+		it('should return unauthorized', function(done) {
+			agent
+				.post('/api/token')
+				.send({username: 'foo', password: 'bar'})
+				.expect(401)
+				.end(done)
+		});
+
+
+		describe('user authentication', function() {
+			it ('should return a token', function(done) {
+				agent
+					.post('/api/token')
+					.send({username: 'desmond', password: 'password'})
+					.expect(200)
+					.end(done)
+			})
+		});
+	});
+})
